@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Max Suika</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<style>
+  :root{
+    --bg:#0d1b12;
+    --panel:#13261a;
+    --rim:#3ddc6e;
+    --rim-dark:#1f7a3f;
+    --cream:#f4efd9;
+    --danger:#ff5a52;
+    --ink:#e9f7ec;
+    --muted:#7fae8c;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;}
+  body{
+    background:
+      radial-gradient(150% 95% at 50% 6%, rgba(255,250,236,.55) 0%, transparent 55%),
+      repeating-linear-gradient(90deg, rgba(190,138,78,.07) 0 40px, transparent 40px 80px),
+      repeating-linear-gradient(0deg, rgba(190,138,78,.07) 0 40px, transparent 40px 80px),
+      repeating-linear-gradient(180deg, rgba(150,100,55,.045) 0 2px, transparent 2px 64px),
+      linear-gradient(180deg, #f6e8ce 0%, #efddbd 42%, #e8d0a7 60%, #e1c595 100%);
+    background-attachment:fixed;
+    color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Yu Gothic",system-ui,sans-serif;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-start;
+    min-height:100%;padding:14px 12px 28px;
+    user-select:none;-webkit-user-select:none;overflow-x:hidden;
+  }
+  .wrap{width:100%;max-width:420px;}
+  header{
+    display:flex;align-items:baseline;justify-content:space-between;
+    margin-bottom:10px;
+  }
+  .brand{display:flex;align-items:baseline;gap:8px;}
+  .brand .max{
+    font-weight:900;font-size:34px;letter-spacing:.06em;
+    color:var(--danger);transform:translateY(0);
+    text-shadow:0 2px 0 #7a1c18;
+  }
+  .brand h1{
+    margin:0;font-size:34px;font-weight:900;letter-spacing:-.01em;
+    background:linear-gradient(180deg,#7dffb0,#19a64e);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    text-shadow:0 2px 0 #0a160e;
+  }
+  .scorebox{text-align:right;line-height:1;}
+  .scorebox .label{font-size:10px;letter-spacing:.25em;color:var(--muted);}
+  .scorebox .val{font-size:30px;font-weight:900;font-variant-numeric:tabular-nums;}
+  .scorebox .best{font-size:11px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums;}
+
+  .stage{
+    position:relative;width:100%;border-radius:18px;overflow:hidden;
+    background:linear-gradient(180deg,#16301f,#0e2114);
+    border:1px solid #1d3d28;
+    box-shadow:inset 0 1px 0 #2c5a3a, 0 18px 40px -20px #000;
+  }
+  canvas{display:block;width:100%;touch-action:none;cursor:pointer;}
+
+  .nextbar{
+    display:flex;align-items:center;justify-content:space-between;
+    margin:10px 2px 0;font-size:12px;color:var(--muted);
+  }
+  .next{display:flex;align-items:center;gap:8px;}
+  .next .dot{
+    width:26px;height:26px;border-radius:50%;display:grid;place-items:center;
+    font-size:15px;box-shadow:inset 0 -3px 6px #0003;
+  }
+  .reset{
+    background:#1d3d28;color:var(--ink);border:1px solid #2c5a3a;
+    border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700;
+    cursor:pointer;letter-spacing:.04em;
+  }
+  .reset:active{transform:scale(.96);}
+
+  .overlay{
+    position:absolute;inset:0;display:none;flex-direction:column;
+    align-items:center;justify-content:center;gap:14px;
+    background:#08130bdd;backdrop-filter:blur(3px);z-index:5;text-align:center;
+  }
+  .overlay.show{display:flex;}
+  .overlay h2{margin:0;font-size:40px;font-weight:900;color:var(--danger);letter-spacing:.02em;}
+  .overlay p{margin:0;color:var(--ink);font-size:15px;}
+  .overlay .big{font-size:34px;font-weight:900;}
+  .overlay button{
+    margin-top:6px;background:linear-gradient(180deg,#7dffb0,#19a64e);
+    color:#06160c;border:none;border-radius:999px;padding:13px 30px;
+    font-size:16px;font-weight:900;cursor:pointer;letter-spacing:.06em;
+    box-shadow:0 8px 20px -8px #19a64e;
+  }
+  .overlay button:active{transform:scale(.96);}
+  .hint{margin-top:12px;text-align:center;font-size:11px;color:var(--muted);letter-spacing:.04em;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <span class="max">MAX</span>
+      <h1>Suika</h1>
+    </div>
+    <div class="scorebox">
+      <div class="label">SCORE</div>
+      <div class="val" id="score">0</div>
+      <div class="best" id="best">BEST 0</div>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <canvas id="board"></canvas>
+    <div class="overlay" id="overlay">
+      <h2>GAME OVER</h2>
+      <p>スコア <span class="big" id="finalScore">0</span></p>
+      <button id="again">もう一回</button>
+    </div>
+  </div>
+
+  <div class="nextbar">
+    <div class="next">NEXT
+      <span class="dot" id="nextDot"></span>
+      <span id="nextName"></span>
+    </div>
+    <button class="reset" id="reset">リセット</button>
+  </div>
+  <div class="hint">タップ／クリックでフルーツを落とす ・ 同じもの同士が合体</div>
+</div>
+
+<script>
+const { Engine, Render, Runner, World, Bodies, Body, Events, Composite } = Matter;
+
+// ---- フルーツ定義（小さい順に合体していく） ----
+const FRUITS = [
+  { name:"さくらんぼ", r:16,  color:"#e8455b", emoji:"🍒", score:1 },
+  { name:"いちご",     r:23,  color:"#f06292", emoji:"🍓", score:3 },
+  { name:"ぶどう",     r:31,  color:"#9b6cd6", emoji:"🍇", score:6 },
+  { name:"デコポン",   r:39,  color:"#f9a825", emoji:"🍊", score:10 },
+  { name:"かき",       r:48,  color:"#fb8c00", emoji:"🟠", score:15 },
+  { name:"りんご",     r:58,  color:"#ef5350", emoji:"🍎", score:21 },
+  { name:"なし",       r:68,  color:"#cddc39", emoji:"🍐", score:28 },
+  { name:"もも",       r:79,  color:"#ffab91", emoji:"🍑", score:36 },
+  { name:"パイナップル",r:92,  color:"#fdd835", emoji:"🍍", score:45 },
+  { name:"メロン",     r:106, color:"#aed581", emoji:"🍈", score:55 },
+  { name:"すいか",     r:122, color:"#43a047", emoji:"🍉", score:66 },
+];
+const MAX_DROP_INDEX = 4; // ドロップで出るのは index 0〜4 まで
+
+// ---- 盤面サイズ ----
+const W = 400, H = 560;
+const WALL = 14;          // 壁の厚み
+const DROP_LINE = 92;     // この高さより上に居続けるとゲームオーバー
+const GAME_OVER_GRACE = 75; // フレーム数の猶予
+
+const stage = document.getElementById('stage');
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+
+// 高解像度対応
+function fitCanvas(){
+  const cssW = stage.clientWidth;
+  const cssH = cssW * (H / W);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  canvas.style.height = cssH + 'px';
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+
+const engine = Engine.create();
+engine.gravity.y = 1.1;
+const world = engine.world;
+
+// 壁
+function buildWalls(){
+  const opt = { isStatic:true, render:{visible:false}, friction:0.3 };
+  World.add(world, [
+    Bodies.rectangle(W/2, H+WALL/2, W, WALL*2, opt),                 // 床
+    Bodies.rectangle(-WALL/2, H/2, WALL*2, H*2, opt),                // 左
+    Bodies.rectangle(W+WALL/2, H/2, WALL*2, H*2, opt),               // 右
+  ]);
+}
+buildWalls();
+
+// ---- 状態 ----
+let score = 0;
+let best = 0;
+try { best = parseInt(window.__suikaBest || '0') || 0; } catch(e){}
+let currentIndex = randDropIndex();
+let nextIndex = randDropIndex();
+let pendingDrop = true;     // 落とせる状態か
+let dropX = W/2;
+let gameOver = false;
+let popAnims = [];          // 合体エフェクト
+let overflowTimer = 0;
+
+function randDropIndex(){ return Math.floor(Math.random()*(MAX_DROP_INDEX+1)); }
+
+function addFruit(index, x, y, opts={}){
+  const f = FRUITS[index];
+  const body = Bodies.circle(x, y, f.r, {
+    restitution: 0.18,
+    friction: 0.4,
+    frictionStatic: 0.6,
+    density: 0.0011,
+    render:{visible:false},
+    ...opts
+  });
+  body.fruitIndex = index;
+  body.merging = false;
+  body.bornAt = performance.now();
+  World.add(world, body);
+  return body;
+}
+
+// ---- 合体処理 ----
+Events.on(engine, 'collisionStart', (ev)=>{
+  for(const pair of ev.pairs){
+    const a = pair.bodyA, b = pair.bodyB;
+    if(a.fruitIndex===undefined || b.fruitIndex===undefined) continue;
+    if(a.fruitIndex !== b.fruitIndex) continue;
+    if(a.merging || b.merging) continue;
+    if(a.fruitIndex >= FRUITS.length-1){ // すいか同士は消すだけ
+      a.merging=b.merging=true;
+      const mx=(a.position.x+b.position.x)/2, my=(a.position.y+b.position.y)/2;
+      World.remove(world,a); World.remove(world,b);
+      addScore(FRUITS[FRUITS.length-1].score*2);
+      popAnims.push({x:mx,y:my,r:FRUITS[a.fruitIndex].r,color:FRUITS[a.fruitIndex].color,t:0});
+      continue;
+    }
+    a.merging=b.merging=true;
+    const ni = a.fruitIndex+1;
+    const mx=(a.position.x+b.position.x)/2, my=(a.position.y+b.position.y)/2;
+    World.remove(world,a); World.remove(world,b);
+    const nb = addFruit(ni, mx, my);
+    // 合体時に少し弾ませる
+    Body.setVelocity(nb, {x:0, y:-1.2});
+    addScore(FRUITS[ni].score);
+    popAnims.push({x:mx,y:my,r:FRUITS[ni].r,color:FRUITS[ni].color,t:0});
+  }
+});
+
+function addScore(v){
+  score += v;
+  document.getElementById('score').textContent = score;
+  if(score>best){ best=score; window.__suikaBest=String(best);
+    document.getElementById('best').textContent = 'BEST '+best; }
+}
+
+// ---- 入力 ----
+function pointerX(e){
+  const rect = canvas.getBoundingClientRect();
+  const clientX = (e.touches? e.touches[0].clientX : e.clientX);
+  let x = (clientX - rect.left) / rect.width * W;
+  const r = FRUITS[currentIndex].r;
+  return Math.max(WALL+r, Math.min(W-WALL-r, x));
+}
+function onMove(e){ if(gameOver) return; dropX = pointerX(e); }
+function onDrop(e){
+  if(gameOver || !pendingDrop) return;
+  dropX = pointerX(e);
+  const idx = currentIndex;
+  addFruit(idx, dropX, DROP_LINE-10);
+  pendingDrop = false;
+  currentIndex = nextIndex;
+  nextIndex = randDropIndex();
+  updateNext();
+  setTimeout(()=>{ if(!gameOver) pendingDrop=true; }, 380); // 連投防止
+}
+canvas.addEventListener('mousemove', onMove);
+canvas.addEventListener('mousedown', e=>{ onMove(e); });
+canvas.addEventListener('mouseup', onDrop);
+canvas.addEventListener('touchmove', e=>{ e.preventDefault(); onMove(e); }, {passive:false});
+canvas.addEventListener('touchstart', e=>{ e.preventDefault(); onMove(e); }, {passive:false});
+canvas.addEventListener('touchend', e=>{ e.preventDefault(); onDrop(e); }, {passive:false});
+
+function updateNext(){
+  const f = FRUITS[nextIndex];
+  const dot = document.getElementById('nextDot');
+  dot.style.background = f.color;
+  dot.textContent = f.emoji;
+  document.getElementById('nextName').textContent = f.name;
+}
+
+// ---- 描画 ----
+function drawFruit(x,y,index,angle){
+  const f = FRUITS[index];
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(angle||0);
+  // 本体
+  const g = ctx.createRadialGradient(-f.r*0.3,-f.r*0.35,f.r*0.1, 0,0,f.r);
+  g.addColorStop(0, lighten(f.color,28));
+  g.addColorStop(1, f.color);
+  ctx.beginPath(); ctx.arc(0,0,f.r,0,Math.PI*2);
+  ctx.fillStyle=g; ctx.fill();
+  // ふち
+  ctx.lineWidth=Math.max(1.5,f.r*0.04);
+  ctx.strokeStyle=darken(f.color,18); ctx.stroke();
+  // ハイライト
+  ctx.beginPath();
+  ctx.ellipse(-f.r*0.32,-f.r*0.38,f.r*0.28,f.r*0.18,-0.5,0,Math.PI*2);
+  ctx.fillStyle="rgba(255,255,255,.45)"; ctx.fill();
+  // 絵文字
+  ctx.font = (f.r*1.05)+"px serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(f.emoji, 0, f.r*0.06);
+  ctx.restore();
+}
+function lighten(hex,amt){ return shade(hex,amt); }
+function darken(hex,amt){ return shade(hex,-amt); }
+function shade(hex,amt){
+  const n=parseInt(hex.slice(1),16);
+  let r=(n>>16)+amt, g=((n>>8)&255)+amt, b=(n&255)+amt;
+  r=Math.max(0,Math.min(255,r)); g=Math.max(0,Math.min(255,g)); b=Math.max(0,Math.min(255,b));
+  return '#'+((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+}
+
+function render(){
+  ctx.clearRect(0,0,W,H);
+
+  // ドロップライン
+  ctx.save();
+  ctx.setLineDash([6,8]);
+  ctx.strokeStyle="rgba(255,90,82,.45)";
+  ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(WALL,DROP_LINE); ctx.lineTo(W-WALL,DROP_LINE); ctx.stroke();
+  ctx.restore();
+
+  // 落下予告（ガイド線＋待機フルーツ）
+  if(pendingDrop && !gameOver){
+    const r = FRUITS[currentIndex].r;
+    ctx.save();
+    ctx.strokeStyle="rgba(255,255,255,.12)";
+    ctx.lineWidth=2; ctx.setLineDash([3,7]);
+    ctx.beginPath(); ctx.moveTo(dropX,DROP_LINE); ctx.lineTo(dropX,H-WALL); ctx.stroke();
+    ctx.restore();
+    drawFruit(dropX, DROP_LINE-10, currentIndex, 0);
+  }
+
+  // フルーツ本体
+  const bodies = Composite.allBodies(world);
+  for(const b of bodies){
+    if(b.fruitIndex===undefined) continue;
+    drawFruit(b.position.x, b.position.y, b.fruitIndex, b.angle);
+  }
+
+  // 合体エフェクト
+  popAnims = popAnims.filter(p=>p.t<1);
+  for(const p of popAnims){
+    p.t += 0.08;
+    ctx.save();
+    ctx.globalAlpha = (1-p.t)*0.6;
+    ctx.beginPath();
+    ctx.arc(p.x,p.y,p.r*(1+p.t*0.6),0,Math.PI*2);
+    ctx.strokeStyle=p.color; ctx.lineWidth=4; ctx.stroke();
+    ctx.restore();
+  }
+}
+
+// ---- ゲームオーバー判定 ----
+function checkGameOver(){
+  if(gameOver) return;
+  let over=false;
+  const bodies = Composite.allBodies(world);
+  for(const b of bodies){
+    if(b.fruitIndex===undefined) continue;
+    if(performance.now()-b.bornAt < 700) continue; // 投入直後は除外
+    const top = b.position.y - FRUITS[b.fruitIndex].r;
+    const slow = Math.abs(b.velocity.y) < 0.6;
+    if(top < DROP_LINE && slow){ over=true; break; }
+  }
+  if(over){ overflowTimer++; if(overflowTimer>GAME_OVER_GRACE) endGame(); }
+  else overflowTimer = Math.max(0, overflowTimer-2);
+}
+
+function endGame(){
+  gameOver = true; pendingDrop=false;
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('overlay').classList.add('show');
+}
+
+function reset(){
+  const bodies = Composite.allBodies(world);
+  for(const b of bodies){ if(b.fruitIndex!==undefined) World.remove(world,b); }
+  score=0; document.getElementById('score').textContent='0';
+  gameOver=false; pendingDrop=true; overflowTimer=0; popAnims=[];
+  currentIndex=randDropIndex(); nextIndex=randDropIndex();
+  updateNext();
+  document.getElementById('overlay').classList.remove('show');
+}
+document.getElementById('again').addEventListener('click', reset);
+document.getElementById('reset').addEventListener('click', reset);
+
+// ---- ループ ----
+const runner = Runner.create();
+Runner.run(runner, engine);
+function loop(){ checkGameOver(); render(); requestAnimationFrame(loop); }
+
+window.addEventListener('resize', fitCanvas);
+fitCanvas();
+updateNext();
+document.getElementById('best').textContent='BEST '+best;
+loop();
+</script>
+</body>
+</html>
