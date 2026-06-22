@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -125,9 +125,66 @@
   }
   .overlay button:active{transform:scale(.96);}
   .hint{margin-top:12px;text-align:center;font-size:11px;color:#a07d44;letter-spacing:.04em;}
+
+  /* スタート画面（デバイス選択） */
+  .start{
+    position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+    padding:24px;
+    background:
+      radial-gradient(150% 95% at 50% 6%, rgba(255,250,236,.6) 0%, transparent 55%),
+      linear-gradient(180deg,#f6e8ce 0%,#efddbd 45%,#e1c595 100%);
+  }
+  .start.hide{display:none;}
+  .start-card{
+    width:100%;max-width:360px;text-align:center;border-radius:28px;padding:32px 26px;
+    background:linear-gradient(180deg, rgba(255,252,242,.97), rgba(246,231,200,.97));
+    border:1px solid #e7cf9f;
+    box-shadow:inset 0 2px 0 #fffaf0, 0 22px 50px -20px #9a7b3f;
+  }
+  .start-title{display:flex;gap:8px;justify-content:center;align-items:baseline;margin-bottom:4px;}
+  .start-title .max{font-weight:900;font-size:36px;color:var(--danger);text-shadow:0 2px 0 #7a1c18;}
+  .start-title .name{
+    font-weight:900;font-size:36px;
+    background:linear-gradient(180deg,#34c46a,#1c7e3e);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .start-sub{margin:8px 0 24px;color:#a07d44;font-size:14px;font-weight:700;}
+  .start-btns{display:flex;gap:14px;justify-content:center;}
+  .dev{
+    flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;
+    background:linear-gradient(180deg,#fffdf8,#f0dcb4);border:1px solid #e7cf9f;
+    border-radius:20px;padding:22px 10px;font-size:38px;cursor:pointer;color:#8a5a22;
+    box-shadow:0 6px 14px -6px #9a7b3f99;
+  }
+  .dev span{font-size:15px;font-weight:800;letter-spacing:.04em;}
+  .dev:active{transform:scale(.96);}
+
+  /* スマホ向けにコンパクト化（縦に収める） */
+  .mode-mobile .title{margin-bottom:6px;}
+  .mode-mobile .title .max,.mode-mobile .title .name{font-size:23px;}
+  .mode-mobile .panel{padding:7px 13px;border-radius:18px;}
+  .mode-mobile .panel .label{font-size:11px;}
+  .mode-mobile .score-panel .val{font-size:31px;}
+  .mode-mobile .next-panel{min-width:74px;}
+  .mode-mobile .next-panel .dot{width:40px;height:40px;font-size:23px;}
+  .mode-mobile .topbar{margin-bottom:8px;}
+  .mode-mobile .bottombar{margin-top:8px;}
+  .mode-mobile .wheel-panel{padding:6px 10px 8px;}
+  .mode-mobile .wheel{transform:scale(.74);margin:-19px -8px;}
+  .mode-mobile .hint{margin-top:8px;font-size:10px;}
 </style>
 </head>
 <body>
+<div class="start" id="start">
+  <div class="start-card">
+    <div class="start-title"><span class="max">MAX</span><span class="name">Suika</span></div>
+    <p class="start-sub">Choose your device</p>
+    <div class="start-btns">
+      <button class="dev" data-mode="mobile">📱<span>Phone</span></button>
+      <button class="dev" data-mode="pc">💻<span>PC</span></button>
+    </div>
+  </div>
+</div>
 <div class="wrap">
   <div class="title">
     <span class="max">MAX</span><span class="name">Suika</span>
@@ -135,12 +192,12 @@
 
   <div class="topbar">
     <div class="panel score-panel">
-      <div class="label">スコア</div>
+      <div class="label">SCORE</div>
       <div class="val" id="score">0</div>
       <div class="best">BEST SCORE <span id="best">0</span></div>
     </div>
     <div class="panel next-panel">
-      <div class="label">ネクスト</div>
+      <div class="label">NEXT</div>
       <span class="dot" id="nextDot"></span>
     </div>
   </div>
@@ -149,19 +206,19 @@
     <canvas id="board"></canvas>
     <div class="overlay" id="overlay">
       <h2>GAME OVER</h2>
-      <p>スコア <span class="big" id="finalScore">0</span></p>
-      <button id="again">もう一回</button>
+      <p>Score <span class="big" id="finalScore">0</span></p>
+      <button id="again">Play Again</button>
     </div>
   </div>
 
   <div class="bottombar">
-    <button class="reset" id="reset">リセット</button>
+    <button class="reset" id="reset">Reset</button>
     <div class="wheel-panel">
-      <div class="label">進化の輪</div>
+      <div class="label">EVOLUTION</div>
       <div class="wheel" id="wheel"></div>
     </div>
   </div>
-  <div class="hint">タップ／クリックでフルーツを落とす ・ 同じもの同士が合体</div>
+  <div class="hint" id="hint">Tap / click to drop a fruit • matching fruits merge</div>
 </div>
 
 <script>
@@ -169,17 +226,17 @@ const { Engine, Render, Runner, World, Bodies, Body, Events, Composite } = Matte
 
 // ---- フルーツ定義（小さい順に合体していく） ----
 const FRUITS = [
-  { name:"さくらんぼ", r:16,  color:"#e8455b", emoji:"🍒", score:1 },
-  { name:"いちご",     r:23,  color:"#f06292", emoji:"🍓", score:3 },
-  { name:"ぶどう",     r:31,  color:"#9b6cd6", emoji:"🍇", score:6 },
-  { name:"デコポン",   r:39,  color:"#f9a825", emoji:"🍊", score:10 },
-  { name:"かき",       r:48,  color:"#fb8c00", emoji:"🟠", score:15 },
-  { name:"りんご",     r:58,  color:"#ef5350", emoji:"🍎", score:21 },
-  { name:"なし",       r:68,  color:"#cddc39", emoji:"🍐", score:28 },
-  { name:"もも",       r:79,  color:"#ffab91", emoji:"🍑", score:36 },
-  { name:"パイナップル",r:92,  color:"#fdd835", emoji:"🍍", score:45 },
-  { name:"メロン",     r:106, color:"#aed581", emoji:"🍈", score:55 },
-  { name:"すいか",     r:122, color:"#43a047", emoji:"🍉", score:66 },
+  { name:"Cherry",     r:16,  color:"#e8455b", emoji:"🍒", score:1 },
+  { name:"Strawberry", r:23,  color:"#f06292", emoji:"🍓", score:3 },
+  { name:"Grape",      r:31,  color:"#9b6cd6", emoji:"🍇", score:6 },
+  { name:"Dekopon",    r:39,  color:"#f9a825", emoji:"🍊", score:10 },
+  { name:"Persimmon",  r:48,  color:"#fb8c00", emoji:"🟠", score:15 },
+  { name:"Apple",      r:58,  color:"#ef5350", emoji:"🍎", score:21 },
+  { name:"Pear",       r:68,  color:"#cddc39", emoji:"🍐", score:28 },
+  { name:"Peach",      r:79,  color:"#ffab91", emoji:"🍑", score:36 },
+  { name:"Pineapple",  r:92,  color:"#fdd835", emoji:"🍍", score:45 },
+  { name:"Melon",      r:106, color:"#aed581", emoji:"🍈", score:55 },
+  { name:"Watermelon", r:122, color:"#43a047", emoji:"🍉", score:66 },
 ];
 const MAX_DROP_INDEX = 4; // ドロップで出るのは index 0〜4 まで
 
@@ -192,13 +249,26 @@ const GAME_OVER_GRACE = 75; // フレーム数の猶予
 const stage = document.getElementById('stage');
 const canvas = document.getElementById('board');
 const ctx = canvas.getContext('2d');
+const wrap = document.querySelector('.wrap');
 
-// 高解像度対応
+let mode = 'pc';       // 'mobile' | 'pc'
+let started = false;   // スタート画面で選択するまで false
+
+// 画面に収まるようキャンバスサイズを計算（高解像度対応）
 function fitCanvas(){
-  const cssW = stage.clientWidth;
-  const cssH = cssW * (H / W);
+  const ratio = H / W;                       // 縦横比 1.4
+  const pad = 24;                            // body の左右余白
+  let maxW = Math.min(window.innerWidth - pad, mode==='pc' ? 440 : 480);
+  // 上下のUIぶんを引いて、縦に収まる幅を求める
+  const reserve = mode==='pc' ? 250 : 290;
+  const availH = window.innerHeight - reserve;
+  let targetW = maxW;
+  if(availH > 180) targetW = Math.min(maxW, availH / ratio);
+  targetW = Math.max(200, Math.round(targetW));
+
+  wrap.style.maxWidth = targetW + 'px';      // パネルも一緒に揃える
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  canvas.style.height = cssH + 'px';
+  canvas.style.height = (targetW * ratio) + 'px';
   canvas.width = W * dpr;
   canvas.height = H * dpr;
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -225,7 +295,7 @@ let best = 0;
 try { best = parseInt(window.__suikaBest || '0') || 0; } catch(e){}
 let currentIndex = randDropIndex();
 let nextIndex = randDropIndex();
-let pendingDrop = true;     // 落とせる状態か
+let pendingDrop = false;    // 落とせる状態か（スタート後にtrue）
 let dropX = W/2;
 let gameOver = false;
 let popAnims = [];          // 合体エフェクト
@@ -292,9 +362,9 @@ function pointerX(e){
   const r = FRUITS[currentIndex].r;
   return Math.max(WALL+r, Math.min(W-WALL-r, x));
 }
-function onMove(e){ if(gameOver) return; dropX = pointerX(e); }
+function onMove(e){ if(!started || gameOver) return; dropX = pointerX(e); }
 function onDrop(e){
-  if(gameOver || !pendingDrop) return;
+  if(!started || gameOver || !pendingDrop) return;
   dropX = pointerX(e);
   const idx = currentIndex;
   addFruit(idx, dropX, DROP_LINE-10);
@@ -451,12 +521,30 @@ function reset(){
 document.getElementById('again').addEventListener('click', reset);
 document.getElementById('reset').addEventListener('click', reset);
 
+// ---- デバイス選択 ----
+function chooseDevice(m){
+  mode = m;
+  document.body.classList.add(m==='mobile' ? 'mode-mobile' : 'mode-pc');
+  document.getElementById('hint').textContent =
+    (m==='mobile')
+      ? 'Slide your finger to aim, release to drop • matching fruits merge'
+      : 'Move with the mouse → click to drop • matching fruits merge';
+  document.getElementById('start').classList.add('hide');
+  started = true;
+  pendingDrop = true;
+  fitCanvas();
+}
+document.querySelectorAll('.dev').forEach(btn=>{
+  btn.addEventListener('click', ()=> chooseDevice(btn.dataset.mode));
+});
+
 // ---- ループ ----
 const runner = Runner.create();
 Runner.run(runner, engine);
 function loop(){ checkGameOver(); render(); requestAnimationFrame(loop); }
 
 window.addEventListener('resize', fitCanvas);
+window.addEventListener('orientationchange', ()=> setTimeout(fitCanvas, 200));
 fitCanvas();
 updateNext();
 buildWheel();
